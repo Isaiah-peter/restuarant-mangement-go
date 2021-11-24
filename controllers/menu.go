@@ -27,7 +27,7 @@ func GetMenus() gin.HandlerFunc {
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while fetch data"})
 		}
-		var allmenus = []bson.M{}
+		var allmenus []bson.M
 		if err := result.All(ctx, &allmenus); err != nil {
 			log.Fatal(err)
 		}
@@ -74,9 +74,7 @@ func CreateMenu() gin.HandlerFunc {
 		menu.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		menu.DeletedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		menu.ID = primitive.NewObjectID()
-
 		menu.MenuId = menu.ID.Hex()
-
 		result, inserterr := menuCollection.InsertOne(ctx, menu)
 		if inserterr != nil {
 			msg := fmt.Sprintf("menu is not created")
@@ -89,6 +87,10 @@ func CreateMenu() gin.HandlerFunc {
 	}
 }
 
+func inTimeStamp(end, start, check time.Time) bool {
+	return start.After(time.Now()) && end.After(start)
+}
+
 func UpdateMenu() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
@@ -96,6 +98,7 @@ func UpdateMenu() gin.HandlerFunc {
 
 		if err := c.BindJSON(&menu); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			defer cancel()
 			return
 		}
 
@@ -105,36 +108,36 @@ func UpdateMenu() gin.HandlerFunc {
 		var updateObj primitive.D
 
 		if menu.StartDate != nil && menu.EndDate != nil {
-			if !inTimeStamp(*menu.StartDate, *&menu.EndDate, time.Now()) {
+			if !inTimeStamp(*menu.StartDate, *menu.EndDate, time.Now()) {
 				msg := "kindly retype the time"
 				c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
 				defer cancel()
 				return
 			}
-			updateObj = append(updateObj, bson.E{"start_date": menu.StartDate})
-			updateObj = append(updateObj, bson.E{"end_date": menu.EndDate})
+			updateObj = append(updateObj, bson.E{"start_date", menu.StartDate})
+			updateObj = append(updateObj, bson.E{"end_date", menu.EndDate})
 
 			if menu.Name != "" {
-				updateObj = append(updateObj, bson.E{"name": menu.Name})
+				updateObj = append(updateObj, bson.E{"name", menu.Name})
 			}
 
 			if menu.Category != "" {
-				updateObj = append(updateObj, bson.E{"name": menu.Category})
+				updateObj = append(updateObj, bson.E{"name", menu.Category})
 			}
 
 			menu.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-			updateObj = append(updateObj, bson.E{"updated_at": menu.UpdatedAt})
+			updateObj = append(updateObj, bson.E{"updated_at", menu.UpdatedAt})
 
 			upsert := true
 			opt := options.UpdateOptions{
-				upsert: upsert,
+				Upsert: &upsert,
 			}
 
 			result, err := menuCollection.UpdateOne(
 				ctx,
 				filter,
 				bson.D{
-					{"$set": updateObj},
+					{"$set", updateObj},
 				},
 				&opt,
 			)
