@@ -72,7 +72,7 @@ func CreateMenu() gin.HandlerFunc {
 
 		menu.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		menu.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-		menu.DeletedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+
 		menu.ID = primitive.NewObjectID()
 		menu.MenuId = menu.ID.Hex()
 		result, inserterr := menuCollection.InsertOne(ctx, menu)

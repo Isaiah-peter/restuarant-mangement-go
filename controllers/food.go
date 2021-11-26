@@ -117,7 +117,6 @@ func CreateFood() gin.HandlerFunc {
 
 		food.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		food.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-		food.DeletedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 
 		food.ID = primitive.NewObjectID()
 
