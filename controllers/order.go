@@ -32,6 +32,7 @@ func GetOrders() gin.HandlerFunc {
 
 		if err := result.All(ctx, &allOrders); err != nil {
 			log.Fatal(err)
+			return
 		}
 		c.JSON(http.StatusOK, allOrders)
 
@@ -155,4 +156,18 @@ func UpdateOrder() gin.HandlerFunc {
 		c.JSON(http.StatusOK, result)
 
 	}
+}
+
+func OrderItemOrderCreator(order models.Order) string {
+
+	var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+
+	order.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+	order.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+
+	order.ID = primitive.NewObjectID()
+	order.OrderId = order.ID.Hex()
+	orderCollection.InsertOne(ctx, order)
+	defer cancel()
+	return order.OrderId
 }
