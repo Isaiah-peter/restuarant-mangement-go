@@ -19,6 +19,8 @@ type OrderItemPack struct {
 	OrderItem []models.OrderItem
 }
 
+
+
 var orderItemCollection *mongo.Collection = database.OpenCollection(database.Client, "orderItem")
 
 func GetOrderItems() gin.HandlerFunc {
@@ -45,19 +47,70 @@ func GetOrderItems() gin.HandlerFunc {
 
 func GetOrderItemByOrder() gin.HandlerFunc {
 	return func(c *gin.Context) {
+    orderId := c.Param("order_id")
+		orderItems, err := ItemByOrder(orderId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occur while listing orderitem by order Id"})
+			return
+		}
 
+		c.JSON(http.StatusOK, orderItems)
 	}
 }
 
 func GetOrderItem() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 
+    orderItemId := c.Param("order_item_id")
+		var orderItem models.OrderItem
+
+		 err := orderItemCollection.FindOne(ctx, bson.M{"orderItem_id": orderItemId}).Decode(&orderItem)
+		 defer cancel()
+
+		 if err != nil {
+			 c.JSON(http.StatusInternalServerError, gin.H{"error": "error while fetching orderitem"})
+			 return
+		 }
+
+		 c.JSON(http.StatusOK, orderItem)
 	}
 }
 
 func CreateOrderItem() gin.HandlerFunc {
 	return func(c *gin.Context) {
+    var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		var orderItemPack OrderItemPack
+    var order models.Order
 
+		if err := c.BindJSON(&orderItemPack); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	  order.OrderDate, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+
+		orderItemTobeInserted := []interface{}{}
+
+		order.TableId = orderItemPack.TableId
+		orderId := OrderItemOrderCreator(order)
+   
+
+		for _, orderItem := range orderItemPack.OrderItem {
+			orderItem.OrderId = orderId
+			
+
+			validarteErr := validate.Struct(orderItem)
+		if validarteErr != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": validarteErr.Error()})
+			 return
+		   }
+      
+			 orderItem.ID  = primitive.NewObjectID()
+			 orderItem.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+			 orderItem.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+			 orderItem.OrderItemId = orderItem.ID.Hex()
+
+		}
 	}
 }
 
