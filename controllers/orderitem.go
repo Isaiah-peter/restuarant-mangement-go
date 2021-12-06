@@ -162,5 +162,10 @@ func UpdateOrderItem() gin.HandlerFunc {
 }
 
 func ItemByOrder(id string) (orderitems []primitive.M, err error) {
-	return nil, err
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+
+	matchStage := bson.D{{"$match", bson.D{{"order_id", id}}}}
+	lookupStage := bson.D{{"$lookup", bson.D{{"form", "food"}, {"localField", "food_id"}, {"foreignField", "food_id"}, {"as", "food"}}}}
+	unWindStage := bson.D{{"$unwind", bson.D{{"path", "$food"}, {"preserveNullAndEmptyArrays", true}}}}
+
 }
