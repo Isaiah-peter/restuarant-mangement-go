@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var tableCollection *mongo.Collection = database.OpenCollection(database.Client, "table")
@@ -107,7 +108,27 @@ func UpdateTable() gin.HandlerFunc {
 
 		upsert := true
 
-		opt := options.u
+		opt := options.UpdateOptions{
+			Upsert: &upsert,
+		}
+
+		result, err := orderCollection.UpdateOne(
+			ctx,
+			filter,
+			bson.D{
+				{"$set", updateObj},
+			},
+			&opt,
+		)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error while updating table"})
+			return
+		}
+
+		defer cancel()
+
+		c.JSON(http.StatusOK, result)
 
 	}
 }

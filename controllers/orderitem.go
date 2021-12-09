@@ -162,5 +162,32 @@ func UpdateOrderItem() gin.HandlerFunc {
 }
 
 func ItemByOrder(id string) (orderitems []primitive.M, err error) {
-	return nil, err
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+
+	matchStage := bson.D{{"$match", bson.D{{"order_id", id}}}}
+	lookupStage := bson.D{{"$lookup", bson.D{{"form", "food"}, {"localField", "food_id"}, {"foreignField", "food_id"}, {"as", "food"}}}}
+	unWindStage := bson.D{{"$unwind", bson.D{{"path", "$food"}, {"preserveNullAndEmptyArrays", true}}}}
+
+	lookupOrderStage := bson.D{{"$lookup", bson.D{{"from", "order"}, {"localField", "order_id"}, {"foreignField", "order_id"}, {"as", "order"}}}}
+	unWindOrderStage := bson.D{{"$unwind", bson.D{{"path", "$order"}, {"preserveNullAndEmptyArrys", true}}}}
+
+	lookupTableStage := bson.D{{"$lookup", bson.D{{"from", "table"}, {"localField", "order.table_id"}, {"foreignField", "table_id"}, {"as", "table"}}}}
+	unWindTableStage := bson.D{{"$unwind", bson.D{{"path", "table"}, {"preserveNullAndEmptyArrays", true}}}}
+
+	projectStage := bson.D{
+		{"$project", bson.D{
+			{"id", 0},
+			{"amount", "$food.price"},
+			{"total_count", 1},
+			{"food_name", "$food.name"},
+			{"food_image", "$food.food_image"},
+			{"table_number", "$table.table_number"},
+			{"table_id", "$table.table_id"},
+			{"order_id", "$order.order_id"},
+			{"price", "$food.price"},
+			{"quantity", 1},
+		}}}
+
+	groupStage := bson.D{{"$group", bson.D{{"_id", bson.D{{"order_id", "$order_id"}, {"table_id", "$table_id"}}}}}}
+
 }
