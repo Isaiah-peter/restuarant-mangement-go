@@ -1,16 +1,16 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
 	"golang-restaurant-management/database"
 	"golang-restaurant-management/routes"
 	"os"
+
+	"github.com/gin-gonic/gin"
 
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var foodCollection *mongo.Collection = database.OpenCollection(database.Client, "food")
-
 
 func main() {
 	PORT := os.Getenv("PORT")
@@ -24,5 +24,12 @@ func main() {
 
 	routes.UserRoutes(router)
 
+	routes.FoodRoutes(router)
+	routes.InvoiceRoutes(router)
+	routes.MenuRoutes(router)
+	routes.OrderItemRoutes(router)
+	routes.OrderRoutes(router)
+	routes.TableRoutes(router)
 
+	router.Run(":" + PORT)
 }

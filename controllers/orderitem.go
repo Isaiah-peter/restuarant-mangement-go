@@ -106,7 +106,6 @@ func CreateOrderItem() gin.HandlerFunc {
 			orderItem.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 			orderItem.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 			orderItem.OrderItemId = orderItem.ID.Hex()
-
 		}
 	}
 }
@@ -188,6 +187,39 @@ func ItemByOrder(id string) (orderitems []primitive.M, err error) {
 			{"quantity", 1},
 		}}}
 
-	groupStage := bson.D{{"$group", bson.D{{"_id", bson.D{{"order_id", "$order_id"}, {"table_id", "$table_id"}}}}}}
+	groupStage := bson.D{{"$group", bson.D{{"_id", bson.D{{"order_id", "$order_id"}, {"table_id", "$table_id"}, {"table_number", "$table_number"}, {"patment_due", bson.D{{"$sum", "$amount"}}}, {"total_count", bson.D{{"$sum", 1}}}, {"order_items", bson.D{}}}}}}}
+
+	projectStage2 := bson.D{
+		{"id", 0},
+		{"payment_due", 1},
+		{"total_count", 1},
+		{"table_number", "$_.id.table_number"},
+		{"order_items", 1},
+	}
+
+	result, err := orderItemCollection.Aggregate(ctx, mongo.Pipeline{
+		matchStage,
+		lookupStage,
+		unWindStage,
+		lookupOrderStage,
+		unWindOrderStage,
+		lookupTableStage,
+		unWindTableStage,
+		projectStage,
+		groupStage,
+		projectStage2,
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	if err = result.All(ctx, &orderitems); err != nil {
+		panic(err)
+	}
+
+	defer cancel()
+
+	return orderitems, err
 
 }
