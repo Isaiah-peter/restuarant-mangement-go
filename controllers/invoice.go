@@ -9,7 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type InvoiceVeiwFormat struct {
@@ -79,12 +81,71 @@ func GetInvoice() gin.HandlerFunc {
 
 func CreateInvoice() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var ctx, cancel = context.WithTimeout(context.Background(), time.Second*100)
+
+		var invoice models.Invoice
+
+		if err := c.BindJSON(&invoice); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		invoice.CreatedAt = timetouse
+		invoice.UpdatedAt = timetouse
 
 	}
 }
 
 func UpdateInvoice() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var ctx, cancel = context.WithTimeout(context.Background(), time.Second*100)
 
+		var invoice models.Invoice
+		var invoiceId = c.Param("invoice_id")
+		var filter = bson.M{"invoice_id": invoiceId}
+		if err := c.BindJSON(&invoice); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var updateObj primitive.D
+
+		invoice.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+		updateObj = append(updateObj, bson.E{"update_at", invoice.UpdatedAt})
+
+		if invoice.PaymentMethod != nil {
+			updateObj = append(updateObj, bson.E{"payment_method", invoice.PaymentMethod})
+		}
+
+		status := "PENDING"
+
+		if invoice.PaymentStatus != nil {
+			invoice.PaymentStatus = &status
+			updateObj = append(updateObj, bson.E{"payment_status", invoice.PaymentStatus})
+		}
+
+		upsert := true
+
+		opt := options.UpdateOptions{
+			Upsert: &upsert,
+		}
+
+		result, err := InvoiceCollection.UpdateOne(
+			ctx,
+			filter,
+			bson.D{
+				{"$set", updateObj},
+			},
+			&opt,
+		)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error while updating invioce"})
+			return
+		}
+
+		defer cancel()
+
+		c.JSON(http.StatusOK, result)
 	}
 }
