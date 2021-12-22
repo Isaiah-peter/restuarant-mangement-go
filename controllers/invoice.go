@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"golang-restaurant-management/database"
 	"golang-restaurant-management/models"
 	"net/http"
@@ -84,14 +85,48 @@ func CreateInvoice() gin.HandlerFunc {
 		var ctx, cancel = context.WithTimeout(context.Background(), time.Second*100)
 
 		var invoice models.Invoice
-
 		if err := c.BindJSON(&invoice); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
+		var order models.Order
+
+		err := orderCollection.FindOne(ctx, bson.M{"order_id": invoice.OrderId}).Decode(&order)
+		defer cancel()
+
+		if err != nil {
+			msg := fmt.Sprintf("message: order not found")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
+			return
+		}
+
+		status := "PENDING"
+		if invoice.PaymentStatus != nil {
+			invoice.PaymentStatus = &status
+		}
 		invoice.CreatedAt = timetouse
 		invoice.UpdatedAt = timetouse
+		invoice.PaymentDueDate, _ = time.Parse(time.RFC3339, time.Now().AddDate(0, 0, 1).Format(time.RFC3339))
+		invoice.ID = primitive.NewObjectID()
+
+		invoice.InvoiceId = invoice.ID.Hex()
+
+		validateErr := validate.Struct(invoice)
+		if validateErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error while yoy input your invoice"})
+			return
+		}
+
+		result, err := InvoiceCollection.InsertOne(ctx, invoice)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error while creating invoice "})
+			return
+		}
+		defer cancel()
+
+		c.JSON(http.StatusOK, result)
 
 	}
 }
@@ -115,6 +150,9 @@ func UpdateInvoice() gin.HandlerFunc {
 
 		if invoice.PaymentMethod != nil {
 			updateObj = append(updateObj, bson.E{"payment_method", invoice.PaymentMethod})
+		}
+		if invoice.PaymentStatus != nil {
+			updateObj = append(updateObj, bson.E{"payment_status", invoice.PaymentStatus})
 		}
 
 		status := "PENDING"
