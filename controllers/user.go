@@ -3,13 +3,17 @@ package controllers
 import (
 	"context"
 	"golang-restaurant-management/database"
+	"golang-restaurant-management/helpers"
+	"golang-restaurant-management/models"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/aquasecurity/libbpfgo/helpers"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -35,14 +39,12 @@ func GetUsers() gin.HandlerFunc {
 		startIndex, err = strconv.Atoi(c.Query("startIndex"))
 
 		matchStage := bson.D{{"$match", bson.D{{}}}}
-		projectStage := bson.D{
-			{
+		projectStage := bson.D{{
 				"$project", bson.D{
 					{"_id", 0},
 					{"total_count", 1},
 					{"user_items", bson.D{{"$slice", []interface{}{"$data", startIndex, recordPerPage}}}},
-				},
-			}}
+				}}}
 
 		result, err := foodCollection.Aggregate(ctx, mongo.Pipeline{
 			matchStage, projectStage,
@@ -70,29 +72,84 @@ func GetUsers() gin.HandlerFunc {
 
 func GetUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.TODO(), time.Second*100)
+    var user models.User
+
+		var userId = c.Param("user_id")
+   err := foodCollection.FindOne(ctx, bson.M{"user_id":userId}).Decode(&user)
+   defer cancel()
+	 if err != nil {
+		 c.JSON(http.StatusBadRequest, gin.H{"error": "error while getting this user"})
+	 }
+
+	 c.JSON(http.StatusOK, user)
+
 
 	}
 }
 
 func SingUp() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var ctx, cancel = context.WithTimeout(context.Background(), time.Second*100)
+		var user models.User
+		
 		//convert the JSON data coming from postman to something golang can understand
-
+    if err := c.BindJSON(&user); err != nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "error while trying to convert data to golang understandable format"})
+			return
+		}
 		//validate the data base on user struct
+		validateErr := validate.Struct(&user)
+		if validateErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error while validating" + validateErr.Error()})
+			return
+		}
 
 		// you'll check if the email hav been use by other user
-
+    count, err := usercollection.CountDocuments(ctx, bson.M{"email":user.Email})
+		defer cancel()
+		if err != nil {
+			log.Panic(err)
+			c.JSON(http.StatusConflict, gin.H{"error":"email already used" + " " + *user.Email + " " + *user.FirstName + " " + *user.LastName})
+			return
+		}
 		// hash password
-
+    password := HashPassword(*user.Password)
+		user.Password = &password
 		//you'll also check if the phone no have being already use by another user
+    count, err = usercollection.CountDocuments(ctx, bson.M{"phone": user.Phone})
+		defer cancel()
+		if err != nil {
+			log.Panic(err)
+			c.JSON(http.StatusConflict, gin.H{"error":"phone number already used"})
+			return
+		}
 
+		if count > 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "your email or password are alreay used"})
+			return
+		}
 		//create some extra detail for the user object - created-at, updated-at
-
+		user.CreatedAt = timetouse
+		user.UpdatedAt = timetouse
+		user.ID = primitive.NewObjectID()
+		user.UserId = user.ID.Hex()
+		
 		//generate token and refreshtoken (generat all token function form helper)
+     token, refreshToken, _ := helpers.GenerateAlltoken(*user.Email, *user.Email, *user.FirstName, *user.LastName, *user.UserId )
+		user.Token = &token
+		user.RefreshToken = &refreshToken
+		 //if all ok, then insert the new user into the user collection
+     reusltInsertNumber, insertErr := usercollection.InsertOne(ctx, user)
 
-		//if all ok, then insert the new user into the user collection
-
+		 if insertErr != nil {
+			 c.JSON(http.StatusBadRequest, gin.H{})
+		 }
+		 
 		//return status ok, and send the rusult back
+
+		c.JSON(http.StatusOK, reusltInsertNumber)
+		
 	}
 }
 
