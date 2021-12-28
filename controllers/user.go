@@ -3,9 +3,9 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"golang-restaurant-management/database"
-	helpers "golang-restaurant-management/helpers"
-	"golang-restaurant-management/models"
+	"golang-management-restaurant/database"
+	helpers "golang-management-restaurant/helpers"
+	"golang-management-restaurant/models"
 	"log"
 	"net/http"
 	"strconv"
@@ -136,7 +136,7 @@ func SingUp() gin.HandlerFunc {
 		user.UserId = user.ID.Hex()
 
 		//generate token and refreshtoken (generat all token function form helper)
-		token, refreshToken, _ := helpers.GenerateAlltoken(*user.Email, *user.Email, *user.FirstName, *user.LastName, *user.UserId)
+		token, refreshToken, _ := helpers.GenerateAlltoken(*user.Email, *user.FirstName, *user.LastName, *user.UserId)
 		user.Token = &token
 		user.RefreshToken = &refreshToken
 		//if all ok, then insert the new user into the user collection
