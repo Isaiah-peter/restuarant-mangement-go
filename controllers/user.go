@@ -136,7 +136,7 @@ func SingUp() gin.HandlerFunc {
 		user.UserId = user.ID.Hex()
 
 		//generate token and refreshtoken (generat all token function form helper)
-		token, refreshToken, _ := helpers.GenerateAlltoken(*user.Email, *user.FirstName, *user.LastName, *user.UserId)
+		token, refreshToken, _ := helpers.GenerateAlltoken(*user.Email, *user.FirstName, *user.LastName, user.UserId)
 		user.Token = &token
 		user.RefreshToken = &refreshToken
 		//if all ok, then insert the new user into the user collection
@@ -181,7 +181,7 @@ func Login() gin.HandlerFunc {
 			return
 		}
 		//if all goes well the you generate tokens
-		token, refreshToken, _ := helpers.GenerateAlltoken(*user.Email, *user.FirstName, *user.LastName, *user.UserId)
+		token, refreshToken, _ := helpers.GenerateAlltoken(*user.Email, *user.FirstName, *user.LastName, user.UserId)
 
 		//update tokens - token and refresh token
 		helpers.UpdateAlltoken(token, refreshToken, foundUser.UserId)
