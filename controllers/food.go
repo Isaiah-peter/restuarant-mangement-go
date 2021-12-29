@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"fmt"
-	"golang-restaurant-management/database"
-	"golang-restaurant-management/models"
+	"golang-management-restaurant/database"
+	"golang-management-restaurant/models"
 	"log"
 	"math"
 	"net/http"

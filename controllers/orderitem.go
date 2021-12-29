@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"context"
-	"golang-restaurant-management/database"
-	"golang-restaurant-management/models"
+	"golang-management-restaurant/database"
+	"golang-management-restaurant/models"
 	"log"
 	"net/http"
 	"time"
@@ -89,7 +89,6 @@ func CreateOrderItem() gin.HandlerFunc {
 		order.OrderDate, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 
 		orderItemTobeInserted := []interface{}{}
-
 		order.TableId = orderItemPack.TableId
 		orderId := OrderItemOrderCreator(order)
 
@@ -106,7 +105,19 @@ func CreateOrderItem() gin.HandlerFunc {
 			orderItem.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 			orderItem.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 			orderItem.OrderItemId = orderItem.ID.Hex()
+			var num = toFixed(*&orderItem.UnitPrice, 2)
+			orderItem.UnitPrice = num
+			orderItemTobeInserted = append(orderItemTobeInserted, orderItem)
 		}
+
+		insertOrderItems, err := orderItemCollection.InsertOne(ctx, orderItemTobeInserted)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer cancel()
+
+		c.JSON(http.StatusOK, insertOrderItems)
 	}
 }
 
@@ -187,7 +198,7 @@ func ItemByOrder(id string) (orderitems []primitive.M, err error) {
 			{"quantity", 1},
 		}}}
 
-	groupStage := bson.D{{"$group", bson.D{{"_id", bson.D{{"order_id", "$order_id"}, {"table_id", "$table_id"}, {"table_number", "$table_number"}, {"patment_due", bson.D{{"$sum", "$amount"}}}, {"total_count", bson.D{{"$sum", 1}}}, {"order_items", bson.D{}}}}}}}
+	groupStage := bson.D{{"$group", bson.D{{"_id", bson.D{{"order_id", "$order_id"}, {"table_id", "$table_id"}, {"table_number", "$table_number"}, {"patment_due", bson.D{{"$sum", "$amount"}}}, {"total_count", bson.D{{"$sum", 1}}}, {"order_items", bson.D{{"$push", "$$ROOT"}}}}}}}}
 
 	projectStage2 := bson.D{
 		{"id", 0},

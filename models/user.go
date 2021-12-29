@@ -18,5 +18,5 @@ type User struct {
 	UserId       string             `json:"user_id"`
 	CreatedAt    time.Time          `json:"created_at"`
 	UpdatedAt    time.Time          `json:"updated_at"`
-	Password     string             `json:"password" validate:"required, min=6"`
+	Password     *string            `json:"password" validate:"required, min=6"`
 }

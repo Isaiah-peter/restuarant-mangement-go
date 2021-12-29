@@ -2,14 +2,17 @@ package controllers
 
 import (
 	"context"
-	"golang-restaurant-management/database"
-	"golang-restaurant-management/models"
+	"fmt"
+	"golang-management-restaurant/database"
+	"golang-management-restaurant/models"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type InvoiceVeiwFormat struct {
@@ -79,12 +82,108 @@ func GetInvoice() gin.HandlerFunc {
 
 func CreateInvoice() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var ctx, cancel = context.WithTimeout(context.Background(), time.Second*100)
+
+		var invoice models.Invoice
+		if err := c.BindJSON(&invoice); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var order models.Order
+
+		err := orderCollection.FindOne(ctx, bson.M{"order_id": invoice.OrderId}).Decode(&order)
+		defer cancel()
+
+		if err != nil {
+			msg := fmt.Sprintf("message: order not found")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
+			return
+		}
+
+		status := "PENDING"
+		if invoice.PaymentStatus != nil {
+			invoice.PaymentStatus = &status
+		}
+		invoice.CreatedAt = timetouse
+		invoice.UpdatedAt = timetouse
+		invoice.PaymentDueDate, _ = time.Parse(time.RFC3339, time.Now().AddDate(0, 0, 1).Format(time.RFC3339))
+		invoice.ID = primitive.NewObjectID()
+
+		invoice.InvoiceId = invoice.ID.Hex()
+
+		validateErr := validate.Struct(invoice)
+		if validateErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error while yoy input your invoice"})
+			return
+		}
+
+		result, err := InvoiceCollection.InsertOne(ctx, invoice)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error while creating invoice "})
+			return
+		}
+		defer cancel()
+
+		c.JSON(http.StatusOK, result)
 
 	}
 }
 
 func UpdateInvoice() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var ctx, cancel = context.WithTimeout(context.Background(), time.Second*100)
 
+		var invoice models.Invoice
+		var invoiceId = c.Param("invoice_id")
+		var filter = bson.M{"invoice_id": invoiceId}
+		if err := c.BindJSON(&invoice); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var updateObj primitive.D
+
+		invoice.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+		updateObj = append(updateObj, bson.E{"update_at", invoice.UpdatedAt})
+
+		if invoice.PaymentMethod != nil {
+			updateObj = append(updateObj, bson.E{"payment_method", invoice.PaymentMethod})
+		}
+		if invoice.PaymentStatus != nil {
+			updateObj = append(updateObj, bson.E{"payment_status", invoice.PaymentStatus})
+		}
+
+		status := "PENDING"
+
+		if invoice.PaymentStatus != nil {
+			invoice.PaymentStatus = &status
+			updateObj = append(updateObj, bson.E{"payment_status", invoice.PaymentStatus})
+		}
+
+		upsert := true
+
+		opt := options.UpdateOptions{
+			Upsert: &upsert,
+		}
+
+		result, err := InvoiceCollection.UpdateOne(
+			ctx,
+			filter,
+			bson.D{
+				{"$set", updateObj},
+			},
+			&opt,
+		)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error while updating invioce"})
+			return
+		}
+
+		defer cancel()
+
+		c.JSON(http.StatusOK, result)
 	}
 }
